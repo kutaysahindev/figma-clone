@@ -1,11 +1,18 @@
 //This serves as a collection of all live functionalities w/Liveblocks
 
-import { useMyPresence, useOthers } from "@/liveblocks.config";
+import {
+  useBroadcastEvent,
+  useEventListener,
+  useMyPresence,
+  useOthers,
+} from "@/liveblocks.config";
 import LiveCursors from "./cursor/LiveCursors";
 import { useCallback, useEffect, useState } from "react";
 import CursorChat from "./cursor/CursorChat";
-import { CursorMode, CursorState, Reaction } from "@/types/type";
+import { CursorMode, CursorState, Reaction, ReactionEvent } from "@/types/type";
 import ReactionSelector from "./reaction/ReactionButton";
+import FlyingReaction from "./reaction/FlyingReaction";
+import useInterval from "@/hooks/useInterval";
 
 const Live = () => {
   //--> State Def.
@@ -18,6 +25,56 @@ const Live = () => {
   }); //To manage cursor chat/reactions etc.
 
   const [reaction, setReaction] = useState<Reaction[]>([]); //Reaction Management
+
+  //Custom hook from Liveblocks. Allows to broadcast events to other people in the room
+  const broadcast = useBroadcastEvent();
+
+  //Garbage collector for emojis
+  useInterval(() => {
+    setReaction((reaction) =>
+      reaction.filter((r) => r.timestamp > Date.now() - 4000)
+    );
+  }, 1000);
+
+  //Reaction spawner w/ custom hook
+  useInterval(() => {
+    if (
+      cursorState.mode === CursorMode.Reaction &&
+      cursorState.isPressed &&
+      cursor
+    ) {
+      setReaction((reactions) =>
+        reactions.concat([
+          {
+            point: { x: cursor.x, y: cursor.y },
+            value: cursorState.reaction,
+            timestamp: Date.now(),
+          },
+        ])
+      );
+
+      broadcast({
+        x: cursor.x,
+        y: cursor.y,
+        value: cursorState.reaction,
+      });
+    }
+  }, 100);
+
+  //Custom hook, coming from Liveblocks to get event data that's been broadcasted above
+  useEventListener((eventData) => {
+    const event = eventData.event as ReactionEvent;
+
+    setReaction((reactions) =>
+      reactions.concat([
+        {
+          point: { x: event.x, y: event.y },
+          value: event.value,
+          timestamp: Date.now(),
+        },
+      ])
+    );
+  });
 
   //--> Handler functions
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
@@ -116,6 +173,16 @@ const Live = () => {
       className="h-[100vh] w-full flex justify-center items-center text-center"
     >
       <h1 className="text-2xl text-white">Liveblocks Figma Clone</h1>
+
+      {reaction.map((r) => (
+        <FlyingReaction
+          key={r.timestamp.toString()}
+          x={r.point.x}
+          y={r.point.y}
+          timestamp={r.timestamp}
+          value={r.value}
+        />
+      ))}
 
       {cursor && (
         <CursorChat
