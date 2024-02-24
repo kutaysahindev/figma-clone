@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   handleCanvasMouseDown,
   handleCanvasMouseUp,
+  handleCanvasObjectModified,
   handleCanvaseMouseMove,
   handleResize,
   initializeFabric,
@@ -17,13 +18,15 @@ import {
 } from "@/lib/canvas";
 import { ActiveElement } from "@/types/type";
 import { useMutation, useStorage } from "@/liveblocks.config";
+import { defaultNavElement } from "@/constants";
+import { handleDelete } from "@/lib/key-events";
 
 export default function Page() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const isDrawing = useRef(false);
   const shapeRef = useRef<fabric.Object | null>(null); //Reference to  shape that user is currently drawing
-  const selectedShapeRef = useRef<string | null>("rectangle"); //Reference to shape that user has selected
+  const selectedShapeRef = useRef<string | null>(null); //Reference to shape that user has selected
   const activeObjectRef = useRef<fabric.Object | null>(null);
 
   //Storage allows us to keep key value pairs in sync
@@ -48,12 +51,47 @@ export default function Page() {
     icon: "",
   });
 
+  const deleteAllShapes = useMutation(({ storage }) => {
+    const canvasObjects = storage.get("canvasObjects");
+
+    if (!canvasObjects || canvasObjects.size === 0) {
+      return true;
+
+      for (const [key, value] of canvasObjects.entries()) {
+        canvasObjects.delete(key);
+      }
+
+      return canvasObjects.size === 0;
+    }
+  }, []);
+
+  const deleteShapeFromStorage = useMutation(({ storage }, objectId) => {
+    const canvasObjects = storage.get("canvasObjects");
+
+    canvasObjects.delete(objectId);
+  }, []);
+
   const handleActiveElement = (elem: ActiveElement) => {
     setActiveElement(elem);
+
+    switch (elem?.value) {
+      case "reset":
+        deleteAllShapes();
+        fabricRef.current?.clear();
+        setActiveElement(defaultNavElement);
+        break;
+      case "delete":
+        handleDelete(fabricRef.current as any, deleteShapeFromStorage);
+        setActiveElement(defaultNavElement);
+        break;
+      default:
+        break;
+    }
 
     selectedShapeRef.current = elem?.value as string;
   };
 
+  //This useEffect does all the handling for canvas elements
   useEffect(() => {
     const canvas = initializeFabric({ canvasRef, fabricRef });
 
@@ -90,9 +128,20 @@ export default function Page() {
       });
     });
 
+    canvas.on("object:modified", (options) => {
+      handleCanvasObjectModified({
+        options,
+        syncShapeInStorage,
+      });
+    });
+
     window.addEventListener("resize", () => {
       handleResize({ fabricRef });
     });
+
+    return () => {
+      canvas.dispose();
+    };
   }, []);
 
   useEffect(() => {
