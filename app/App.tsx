@@ -22,6 +22,7 @@ import { handleDelete, handleKeyDown } from "@/lib/key-events";
 import { LeftSidebar, Live, Navbar, RightSidebar } from "@/components/index";
 import { handleImageUpload } from "@/lib/shapes";
 import { defaultNavElement } from "@/constants";
+import Footer from "@/components/Footer";
 import { ActiveElement, Attributes } from "@/types/type";
 
 const Home = () => {
@@ -489,7 +490,7 @@ const Home = () => {
   }, [canvasObjects]);
 
   return (
-    <main className='h-screen overflow-hidden'>
+    <main className="h-screen overflow-hidden">
       <Navbar
         imageInputRef={imageInputRef}
         activeElement={activeElement}
@@ -507,7 +508,7 @@ const Home = () => {
         handleActiveElement={handleActiveElement}
       />
 
-      <section className='flex h-full flex-row'>
+      <section className="flex h-full flex-row">
         <LeftSidebar allShapes={Array.from(canvasObjects)} />
 
         <Live canvasRef={canvasRef} undo={undo} redo={redo} />
@@ -521,6 +522,7 @@ const Home = () => {
           syncShapeInStorage={syncShapeInStorage}
         />
       </section>
+      <Footer />
     </main>
   );
 };
